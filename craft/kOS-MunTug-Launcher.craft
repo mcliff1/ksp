@@ -1,6 +1,6 @@
 ship = kOS-MunTug-Launcher
 version = 1.12.5
-description = Full launcher + tug craft derived from kos-test.craft with decoupler, Swivel, and fin retained.
+description = Full rocket with kOS Mun tug and stock launcher (KSP 1.12.5, kOS 1.5.1).
 type = VAB
 size = 1.97293746,7.75312996,1.45456207
 steamPublishedFileId = 0
@@ -264,8 +264,7 @@ PART
 		isVisible = True
 		flowMode = Both
 	}
-}
-PART
+}PART
 {
 	part = kOSMachine1m_4294566600
 	partName = Part
@@ -415,8 +414,7 @@ PART
 		isVisible = True
 		flowMode = Both
 	}
-}
-PART
+}PART
 {
 	part = dockingPort2_4294560314
 	partName = Part
@@ -592,8 +590,7 @@ PART
 		{
 		}
 	}
-}
-PART
+}PART
 {
 	part = RCSBlock.v2_4294558726
 	partName = Part
@@ -737,8 +734,7 @@ PART
 		{
 		}
 	}
-}
-PART
+}PART
 {
 	part = RCSFuelTank_4294548356
 	partName = Part
@@ -833,8 +829,7 @@ PART
 		isVisible = True
 		flowMode = Both
 	}
-}
-PART
+}PART
 {
 	part = fuelTank_4294543574
 	partName = Part
@@ -957,8 +952,7 @@ PART
 		isVisible = True
 		flowMode = Both
 	}
-}
-PART
+}PART
 {
 	part = fuelTankSmall_4294542410
 	partName = Part
@@ -1080,8 +1074,7 @@ PART
 		isVisible = True
 		flowMode = Both
 	}
-}
-PART
+}PART
 {
 	part = liquidEngine3.v2_4294538972
 	partName = Part
@@ -1361,8 +1354,7 @@ PART
 		{
 		}
 	}
-}
-PART
+}PART
 {
 	part = Decoupler.1_4294536908
 	partName = Part
@@ -1526,8 +1518,7 @@ PART
 		{
 		}
 	}
-}
-PART
+}PART
 {
 	part = liquidEngine2.v2_4294534116
 	partName = Part
@@ -1836,8 +1827,7 @@ PART
 		{
 		}
 	}
-}
-PART
+}PART
 {
 	part = basicFin_4294530280
 	partName = Part

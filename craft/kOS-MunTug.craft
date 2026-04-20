@@ -1,6 +1,6 @@
 ship = kOS-MunTug
 version = 1.12.5
-description = Tug-only craft derived from kos-test.craft with kOS, docking, RCS, fuel, and Terrier engine.
+description = Tug-only kOS Mun tug (no launcher) for KSP 1.12.5 + kOS 1.5.1.
 type = VAB
 size = 1.97293746,7.75312996,1.45456207
 steamPublishedFileId = 0
@@ -1107,7 +1107,6 @@ PART
 	modMass = 0
 	modSize = 0,0,0
 	attN = top,fuelTankSmall_4294542410_0|0|0_0|1|0_0|0|0_0|1|0
-	attN = bottom,Null_0_0|-0.817809999|0_0|-1|0_0|-0.817809999|0_0|-1|0
 	EVENTS
 	{
 	}

@@ -1,23 +1,37 @@
-# ksp
+# KSP 1.12.5 kOS Mun Tug Crafts
+
+This repo contains stock KSP 1.12.5 craft files built to work with kOS 1.5.1 (no Breaking Ground DLC required).
+
+## Included files
+
+- `craft/kOS-MunTug.craft` — tug-only craft
+- `craft/kOS-MunTug-Launcher.craft` — full launcher + tug craft
+- `kos/launch.ks` — example kOS launch script
 
 ## Install
 
-1. Copy the craft files from `craft/` into:
-   - `KSP/saves/<save>/Ships/VAB/`
-2. Copy `kos/launch.ks` into your vessel kOS volume (for example via Archive or local volume as preferred).
+1. Copy craft files into your save's VAB folder:
 
-## Mod requirements
+   - `craft/kOS-MunTug.craft`
+   - `craft/kOS-MunTug-Launcher.craft`
 
-- [kOS](https://github.com/KSP-KOS/KOS) `1.5.1`
+   to:
 
-## Included craft
+   - `KSP/saves/<your-save>/Ships/VAB/`
 
-- `craft/kOS-MunTug.craft` - tug-only craft.
-- `craft/kOS-MunTug-Launcher.craft` - full launcher + tug stack.
+2. Copy `kos/launch.ks` into a kOS-readable volume (for example):
 
-## Basic usage
+   - `KSP/Ships/Script/launch.ks`
 
-1. In KSP VAB, load `kOS-MunTug-Launcher` for launch to orbit.
-2. Start flight and run `launch.ks` from the kOS CPU.
-3. The script performs a basic ascent and circularization to about 80 km.
-4. After circularization, use the tug stage for transfer and rendezvous operations.
+## Use in game
+
+1. Start KSP 1.12.5 with stock parts + kOS 1.5.1.
+2. Open the VAB and load one of the included craft files.
+3. Make sure the kOS CPU has access to `launch.ks`.
+4. On the launchpad, open the kOS terminal and run:
+
+   ```
+   run launch.
+   ```
+
+If your scripts are stored in `0:/`, run with the full path (for example `runpath("0:/launch").`).
