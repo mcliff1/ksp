@@ -13,6 +13,45 @@ The immediate test objective is not crew transport or landing. The objective is 
 
 ## Vehicle configuration requirements
 
+## Current repo status
+
+As of the latest in-game UI update, `craft/kOS-MunTug-Launcher.craft` has moved beyond the original minimal launcher prototype and now includes a more mission-capable service and boost stack.
+
+Observed current launcher configuration:
+
+- tug bus with `HECS2.ProbeCore`, `kOSMachine1m`, `dockingPort2`, and `RCSFuelTank`
+- three `RCSBlock.v2` thruster blocks on the probe section
+- one `batteryBank` mounted in the tug stack
+- four `solarPanels5` OX-STAT panels mounted around the kOS can
+- one `HighGainAntenna5.v2`
+- one upper `Decoupler.1` above the FL-T400 / Terrier segment with crossfeed disabled
+- one `fuelTankSmall` (`FL-T400`)
+- one `liquidEngine3.v2` (`Terrier`)
+- one lower `Decoupler.1` between the Terrier stage and the launcher boost stack with crossfeed enabled
+- two lower-stage `fuelTank` parts (`FL-T800`)
+- one `liquidEngine2.v2` (`Swivel`)
+- four `basicFin` parts on the lower FL-T800
+
+This is materially closer to the intended mission vehicle than the earlier dead-stage version because it now has visible power generation, a dedicated battery, a 4-fin lower stage, and a larger lower boost stack.
+
+## Current review findings
+
+Positive findings from the current launcher craft:
+
+- the craft now includes visible electric power hardware instead of relying only on internal EC storage
+- the launcher now has a 4-fin lower-stage arrangement instead of a single fin
+- the lower launcher decoupler has crossfeed enabled, which fixes the earlier unfueled lower-stage problem
+- the lower stage now uses two FL-T800 tanks under the Terrier stack, which is a much more plausible boost stack for Mun mission margin
+
+Remaining concern to verify in the next session:
+
+- the newly added upper decoupler sits between the tug bus and the FL-T400 / Terrier propulsion section, and it is staged separately from the lower decoupler. That arrangement may leave the probe bus without its main engine after final staging unless the in-game staging order has been intentionally arranged to avoid that outcome.
+
+Practical interpretation:
+
+- the craft now looks close enough to test in KSP
+- the next technical question is no longer whether it loads, but whether staging leaves the final spacecraft with the Terrier and FL-T400 attached for Mun transfer and return
+
 ### Tug requirements
 
 The Mun tug stack is the mission payload and must retain these parts from the `kos-test.craft` baseline:
@@ -25,6 +64,13 @@ The Mun tug stack is the mission payload and must retain these parts from the `k
 - `fuelTankSmall` (`FL-T400`)
 - `liquidEngine3.v2` (`Terrier`)
 - `RCSBlock.v2`
+
+The current launcher craft also includes mission-support hardware not yet reflected in `kos-test.craft`:
+
+- `batteryBank`
+- `solarPanels5`
+- `HighGainAntenna5.v2`
+- additional `RCSBlock.v2` units
 
 The tug is expected to provide roughly 4.6 km/s vacuum delta-v when launched full. That is sufficient for a Mun transfer, Mun-space corrections, and Kerbin return only if the launcher performs the majority of ascent work.
 
@@ -132,8 +178,10 @@ The script does not need to solve docking, landing, or precision science operati
 ## Validation checklist
 
 - craft loads in VAB on KSP 1.12.5 with kOS 1.5.1
+- launcher visibly includes 4 lower fins, one battery, and solar power generation
 - launcher first stage ignites with available propellant
 - launcher remains controllable through max-q
+- final staging leaves the probe bus attached to its Mun-transfer propulsion section
 - tug reaches parking orbit with substantial remaining LF/Ox
 - mission can achieve a Mun intercept with return margin still available
 - script behavior is understandable enough to debug from the kOS terminal
