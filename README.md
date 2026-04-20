@@ -25,6 +25,13 @@ This repo contains stock KSP 1.12.5 craft files built to work with kOS 1.5.1 (no
 
 ## Use in game
 
+this is home folder
+
+```bash
+cd ~/Library/Application\ Support/Steam/steamapps/common/Kerbal\ Space\ Program/
+```
+
+
 1. Start KSP 1.12.5 with stock parts + kOS 1.5.1.
 2. Open the VAB and load one of the included craft files.
 3. Make sure the kOS CPU has access to `launch.ks`.
