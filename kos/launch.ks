@@ -1,16 +1,44 @@
-// Very simple kOS script for launching and controlling a poket-sized NASA Mun Tug.
+// Basic kOS ascent and circularization script for the Mun tug launcher.
+
+set targetApoapsis to 80000.
+set turnStartAltitude to 250.
+set turnEndAltitude to 45000.
+
+sas off.
+rcs off.
 
 lock throttle to 1.
+lock steering to heading(90, 90).
+
+print "Launching...".
 stage.
-wait until ship:rocketry:stage:0:thrust:SHOULD be 0.
 
-// Circularize your orbit at 100km after launch
-set targetOrbit to orbit:equatorial +:p(0, 100000, 0).
+until ship:apoapsis >= targetApoapsis {
+    set frac to (ship:altitude - turnStartAltitude) / (turnEndAltitude - turnStartAltitude).
+    if frac < 0 { set frac to 0. }.
+    if frac > 1 { set frac to 1. }.
 
-lock targetVelocity to targetOrbit:velocity.
-wait until ship:orbit:apoapsis >= targetOrbit:apoapsis - 1000.
+    set pitch to 90 - (80 * frac).
+    lock steering to heading(90, pitch).
 
-lock throttle to 0.2.
-wait until ship:timeToApoapsis < 60.
+    if ship:apoapsis > targetApoapsis * 0.9 {
+        lock throttle to 0.35.
+    }.
+
+    wait 0.1.
+}.
 
 lock throttle to 0.
+print "Apoapsis target reached.".
+
+// Separate from launcher stage if present.
+stage.
+
+wait until eta:apoapsis < 30.
+lock steering to prograde.
+lock throttle to 1.
+
+wait until ship:periapsis >= 78000.
+lock throttle to 0.
+
+print "Orbit established near 80 km.".
