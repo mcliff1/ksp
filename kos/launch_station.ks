@@ -6,7 +6,7 @@ set targetMode to "KERBIN".
 
 set parkingApoapsis to 85000.
 set parkingPeriapsis to 82000.
-set turnStartAltitude to 1200.
+set turnStartAltitude to 8000.
 set turnEndAltitude to 52000.
 set pitchChangeAmount to 70.
 
@@ -17,9 +17,11 @@ set munCaptureApoapsis to 25000.
 set maxTransferWait to 21600.
 set maxMunCoastTime to 259200.
 set captureMode to false.
+set autoLaunch to false.
 
 set minStageInterval to 3.
 set lastStageTime to -999.
+set sideBoostersSeparated to false.
 
 function clamp {
     parameter value, low, high.
@@ -44,14 +46,46 @@ function stage_with_note {
     wait 0.6.
 }.
 
+function stage_to_next_thrust {
+    parameter stageMessage.
+    stage_with_note(stageMessage).
+
+    if ship:availablethrust < 0.1 {
+        wait 0.8.
+
+        if ship:availablethrust < 0.1 {
+            stage_with_note("Auto-staging: igniting next engine stage.").
+        }.
+    }.
+}.
+
 function maybe_autostage {
+    local activeEngineCount is 0.
+    local flameoutEngineCount is 0.
+
     if time:seconds - lastStageTime < minStageInterval {
         return.
     }.
 
+    list engines in engines.
+    for engine in engines {
+        if engine:ignition {
+            set activeEngineCount to activeEngineCount + 1.
+            if engine:flameout {
+                set flameoutEngineCount to flameoutEngineCount + 1.
+            }.
+        }.
+    }.
+
+    if not sideBoostersSeparated and flameoutEngineCount > 0 and ship:availablethrust > 0 {
+        set sideBoostersSeparated to true.
+        stage_with_note("Auto-staging: spent side boosters.").
+        return.
+    }.
+
     // When thrust drops to zero during powered ascent, advance staging.
-    if ship:availablethrust < 0.1 {
-        stage_with_note("Auto-staging: no available thrust.").
+    if activeEngineCount > 0 and ship:availablethrust < 0.1 {
+        stage_to_next_thrust("Auto-staging: no available thrust.").
     }.
 }.
 
@@ -63,7 +97,7 @@ function burn_until_apoapsis {
     until ship:apoapsis >= targetApoapsis {
         maybe_autostage().
 
-        if ship:apoapsis > targetApoapsis * 0.92 {
+        if ship:apoapsis > targetApoapsis * 0.95 {
             lock throttle to reducedThrottle.
         }.
 
@@ -89,12 +123,9 @@ function launch_to_parking_orbit {
         set pitch to 90 - (pitchChangeAmount * frac).
         lock steering to heading(90, pitch).
 
-        if ship:apoapsis > parkingApoapsis * 0.85 {
-            lock throttle to 0.65.
-        }.
-        if ship:apoapsis > parkingApoapsis * 0.95 {
-            lock throttle to 0.3.
-        }.
+        //if ship:apoapsis > parkingApoapsis * 0.95 {
+        //    lock throttle to 0.3.
+        //}.
 
         wait 0.1.
     }.
@@ -105,16 +136,20 @@ function launch_to_parking_orbit {
         stage_with_note("Apoapsis reached. Advancing stage.").
     }.
 
-    wait until eta:apoapsis < 35.
+    print "Coasting to apoapsis for circularization burn.".
+    print "Engine refire planned at eta:apoapsis < 25----------- seconds.".
+
+    wait until eta:apoapsis < 25.
+    print "Refiring engines for circularization.".
     lock steering to prograde.
     lock throttle to 1.
 
     until ship:periapsis >= parkingPeriapsis {
         maybe_autostage().
 
-        if ship:periapsis > parkingPeriapsis * 0.85 {
-            lock throttle to 0.35.
-        }.
+        //if ship:periapsis > parkingPeriapsis * 0.85 {
+        //    lock throttle to 0.35.
+        //}.
         wait 0.1.
     }.
 
@@ -125,6 +160,13 @@ function launch_to_parking_orbit {
 function wait_for_transfer_window {
     set transferStart to time:seconds.
     set currentPhaseAngle to mun_phase_angle().
+    set phaseGap to 0.
+    set lastPhaseAngle to currentPhaseAngle.
+    set lastSampleTime to time:seconds.
+    set phaseRate to 0.
+    set etaToWindow to -1.
+    set deltaAngle to 0.
+    set deltaTime to 0.
 
     print "Waiting for Mun transfer window...".
     until abs(currentPhaseAngle - munTransferPhaseAngle) <= munPhaseTolerance {
@@ -134,7 +176,34 @@ function wait_for_transfer_window {
         }.
 
         set currentPhaseAngle to mun_phase_angle().
-        print "Current Mun phase angle: " + round(currentPhaseAngle, 2).
+        set phaseGap to abs(currentPhaseAngle - munTransferPhaseAngle).
+        if phaseGap > 180 {
+            set phaseGap to 360 - phaseGap.
+        }.
+
+        set deltaTime to time:seconds - lastSampleTime.
+        if deltaTime > 0 {
+            set deltaAngle to abs(currentPhaseAngle - lastPhaseAngle).
+            if deltaAngle > 180 {
+                set deltaAngle to 360 - deltaAngle.
+            }.
+
+            set phaseRate to deltaAngle / deltaTime.
+            if phaseRate > 0.0001 {
+                set etaToWindow to phaseGap / phaseRate.
+            } else {
+                set etaToWindow to -1.
+            }.
+        }.
+
+        if etaToWindow >= 0 {
+            print "Current angle: " + round(currentPhaseAngle, 2) + " | Target: " + munTransferPhaseAngle + " | Gap: " + round(phaseGap, 2) + " | ETA: " + round(etaToWindow / 60, 1) + " min".
+        } else {
+            print "Current angle: " + round(currentPhaseAngle, 2) + " | Target: " + munTransferPhaseAngle + " | Gap: " + round(phaseGap, 2) + " | ETA: estimating...".
+        }.
+
+        set lastPhaseAngle to currentPhaseAngle.
+        set lastSampleTime to time:seconds.
         wait 5.
     }.
 
@@ -180,6 +249,30 @@ function capture_at_mun {
     lock throttle to 0.
     print "Mun capture burn complete.".
 }.
+
+function wait_for_launch_trigger {
+    if autoLaunch {
+        print "Auto-launch enabled; starting immediately.".
+        return.
+    }.
+
+    print "Launch script preloaded.".
+    print "Invoke AG9 for KERBIN launch or AG10 for MUN launch.".
+
+    until ag9 or ag10 {
+        wait 0.1.
+    }.
+
+    if ag10 {
+        set targetMode to "MUN".
+        print "Launch command received (AG10): target set to MUN.".
+    } else {
+        set targetMode to "KERBIN".
+        print "Launch command received (AG9): target set to KERBIN.".
+    }.
+}.
+
+wait_for_launch_trigger().
 
 sas off.
 rcs off.
