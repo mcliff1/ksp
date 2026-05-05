@@ -40,7 +40,7 @@ function mun_phase_angle {
 
 function circularization_lead_time {
     if ship:name = "SS1 Mark2" {
-        return 18.
+        return 15.
     }.
 
     return 25.

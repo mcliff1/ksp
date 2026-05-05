@@ -1,4 +1,4 @@
-// Docking-first intercept workflow for Space Station One.
+// Docking-first intercept workflow for Space Station One - all burns via maneuver nodes.
 // Sequence: plane align -> phase align -> transfer burn -> encounter trim -> velocity match.
 
 parameter interceptMode is "DOCK".
@@ -13,8 +13,9 @@ set statusFastInterval to 0.2.
 set alignTolerance to 1.
 
 set planeToleranceDeg to 0.2.
-set planeWarpExitEta to 120.
-set planeBurnLeadTime to 12.
+set nodeWarpExitEta to 120.
+set nodeBurnLeadTime to 12.
+set nodeImmediateLead to 30.
 set minPlaneDv to 0.2.
 set maxPlaneDv to 120.
 
@@ -29,13 +30,13 @@ set phaseNudgeCooldown to 120.
 set phaseMaxNudges to 4.
 set phaseVerySlowRate to 0.0002.
 
-// Fixed display row assignments (must match README display layout table).
-set rowPlaneBurnCountdown to 8.
+// Fixed display row assignments.
+set rowBurnCountdown to 8.
 set rowBurnStatus to 9.
 set phaseStatusRow to 10.
 set phaseNudgeRow to 11.
-set rowPlaneAlignCountdown to 12.
-set rowPlaneBurnLead to 13.
+set rowNodeWarp to 12.
+set rowBurnLead to 13.
 set rowCoastStatus to 14.
 set rowEncounterTrim to 15.
 set rowVelocityMatchWait to 16.
@@ -76,40 +77,22 @@ if interceptMode = "INTERCEPT" or interceptMode = "intercept" {
 
 function normalize_angle {
     parameter angleDeg.
-
-    until angleDeg >= 0 {
-        set angleDeg to angleDeg + 360.
-    }.
-
-    until angleDeg < 360 {
-        set angleDeg to angleDeg - 360.
-    }.
-
+    until angleDeg >= 0 { set angleDeg to angleDeg + 360. }.
+    until angleDeg < 360 { set angleDeg to angleDeg - 360. }.
     return angleDeg.
 }.
 
 function shortest_angle_diff {
     parameter fromDeg, toDeg.
     local delta is normalize_angle(toDeg - fromDeg).
-
-    if delta > 180 {
-        set delta to delta - 360.
-    }.
-
+    if delta > 180 { set delta to delta - 360. }.
     return delta.
 }.
 
 function clamp {
     parameter value, minValue, maxValue.
-
-    if value < minValue {
-        return minValue.
-    }.
-
-    if value > maxValue {
-        return maxValue.
-    }.
-
+    if value < minValue { return minValue. }.
+    if value > maxValue { return maxValue. }.
     return value.
 }.
 
@@ -119,7 +102,6 @@ function set_warp_limited {
 }.
 
 function force_warp_idle {
-    // Force warp down first, then settle at 1x for safe handoff back to pilot.
     set_warp_limited(0).
     wait 0.1.
     set_warp_limited(1).
@@ -149,28 +131,16 @@ function phase_relative_rate {
 
 function eta_to_phase_window {
     parameter phaseError, relativeRate.
-
     local absRate is abs(relativeRate).
-    if absRate < 0.000001 {
-        return -1.
-    }.
-
-    if abs(phaseError) < 0.0001 {
-        return 0.
-    }.
-
-    if phaseError * relativeRate > 0 {
-        return abs(phaseError) / absRate.
-    }.
-
+    if absRate < 0.000001 { return -1. }.
+    if abs(phaseError) < 0.0001 { return 0. }.
+    if phaseError * relativeRate > 0 { return abs(phaseError) / absRate. }.
     return (360 - abs(phaseError)) / absRate.
 }.
 
 function cleanup_and_exit {
     parameter message.
-    if not abortRequested {
-        set abortReason to message.
-    }.
+    if not abortRequested { set abortReason to message. }.
     set abortRequested to true.
     print message.
     force_warp_idle().
@@ -178,103 +148,66 @@ function cleanup_and_exit {
     unlock steering.
     unlock throttle.
     set ship:control:pilotmainthrottle to 0.
-    print "intercept2 abort cleanup complete.".
+    print "intercept3 abort cleanup complete.".
     return.
 }.
 
-function burn_delta_v_proretro {
-    parameter dvCommand.
-    local burnDirection is "PROGRADE".
-
-    if abs(dvCommand) < 0.05 {
-        print "Burn skipped: dV too small.".
-        return.
-    }.
-
-    if dvCommand >= 0 {
-        lock steering to prograde.
-        set burnDirection to "PROGRADE".
-        wait until vang(ship:facing:vector, prograde:vector) < alignTolerance.
-    } else {
-        lock steering to retrograde.
-        set burnDirection to "RETROGRADE".
-        wait until vang(ship:facing:vector, retrograde:vector) < alignTolerance.
-    }.
-
-    print "Executing " + burnDirection + " burn: " + round(dvCommand, 2) + " m/s      " at (0, rowBurnStatus).
-    lock throttle to 1.
-    set targetVelocity to ship:velocity:orbit:mag + dvCommand.
-
-    if dvCommand >= 0 {
-        until ship:velocity:orbit:mag >= targetVelocity {
-            if targetVelocity - ship:velocity:orbit:mag < coarseThrottleDelta {
-                lock throttle to 0.2.
-            }.
-            if targetVelocity - ship:velocity:orbit:mag < fineThrottleDelta {
-                lock throttle to 0.05.
-            }.
-            wait 0.1.
-        }.
-    } else {
-        until ship:velocity:orbit:mag <= targetVelocity {
-            if ship:velocity:orbit:mag - targetVelocity < coarseThrottleDelta {
-                lock throttle to 0.2.
-            }.
-            if ship:velocity:orbit:mag - targetVelocity < fineThrottleDelta {
-                lock throttle to 0.05.
-            }.
-            wait 0.1.
-        }.
-    }.
-
-    lock throttle to 0.
-}.
-
-function execute_maneuver_node {
-    parameter nd, burnDirSign.
-    // nd must already be created and added before calling this function.
-    // burnDirSign: 1 for normal, -1 for antinormal.
-    // burnDir is recomputed fresh at burn time from the current orbital normal.
+// Unified maneuver node executor.
+// dvAxis: "PROGRADE", "RETROGRADE", "NORMAL", "ANTINORMAL"
+// nd must already be created with add() before calling.
+// Warp to burn window, align using fresh direction computed at burn position, burn for timed duration.
+function execute_burn_node {
+    parameter nd, dvAxis.
 
     local plannedDv is nd:deltav:mag.
 
-    // Estimate burn time for warp lead calculation using current thrust.
     local accel is ship:availablethrust / ship:mass.
     if accel < 0.05 {
         remove nd.
-        cleanup_and_exit("Insufficient thrust to execute maneuver node.").
+        cleanup_and_exit("Insufficient thrust to execute " + dvAxis + " burn node.").
         return.
     }.
     local estBurnTime is plannedDv / accel.
 
-    // Warp toward burn midpoint.
-    if nd:eta - estBurnTime / 2 > planeWarpExitEta {
+    // Warp toward burn midpoint if node is far away.
+    if nd:eta - estBurnTime / 2 > nodeWarpExitEta {
         set_warp_limited(4).
     }.
-    until nd:eta - estBurnTime / 2 <= planeWarpExitEta {
-        print "Node warp | ETA: " + round(nd:eta, 1) + " s   " at (0, rowPlaneAlignCountdown).
+    until nd:eta - estBurnTime / 2 <= nodeWarpExitEta {
+        print "Node warp | " + dvAxis + " | ETA: " + round(nd:eta, 1) + " s   " at (0, rowNodeWarp).
         wait statusSlowInterval.
     }.
     set_warp_limited(0).
-    print "Warp exit | Node ETA: " + round(nd:eta, 1) + " s".
+    print "Warp exit | " + dvAxis + " node ETA: " + round(nd:eta, 1) + " s".
 
-    // Recompute burn direction and time fresh at this orbital position.
-    local hVecNow is vcrs(ship:position - ship:body:position, ship:velocity:orbit).
-    local burnDir is hVecNow:normalized * burnDirSign.
+    // Recompute accel and burn time fresh at burn position.
     set accel to ship:availablethrust / ship:mass.
     local burnTime is plannedDv / accel.
 
+    // Compute burn steering direction from fresh orbital state — no bare identifiers.
+    local proDir is ship:velocity:orbit:normalized.
+    local hVec is vcrs(ship:position - ship:body:position, ship:velocity:orbit).
+    local normDir is hVec:normalized.
+
+    local burnDir is proDir.
+    if dvAxis = "RETROGRADE" {
+        set burnDir to proDir * (-1).
+    } else if dvAxis = "NORMAL" {
+        set burnDir to normDir.
+    } else if dvAxis = "ANTINORMAL" {
+        set burnDir to normDir * (-1).
+    }.
+
     // Align to burn vector.
     lock steering to burnDir.
-    until nd:eta <= burnTime / 2 + planeBurnLeadTime {
-        print "Plane burn lead | ETA: " + round(nd:eta, 1) + " s   " at (0, rowPlaneBurnLead).
+    until nd:eta <= burnTime / 2 + nodeBurnLeadTime {
+        print "Burn lead | " + dvAxis + " | ETA: " + round(nd:eta, 1) + " s   " at (0, rowBurnLead).
         wait 0.1.
     }.
     wait until vang(ship:facing:vector, burnDir) < alignTolerance.
 
-    // Execute timed burn — nd:deltav:mag holds original planned value, does not track residual,
-    // so we burn for the computed burnTime duration with throttle taper near the end.
-    print "Executing plane burn: " + round(plannedDv, 2) + " m/s est " + round(burnTime, 1) + " s      " at (0, rowBurnStatus).
+    // Timed burn with throttle taper.
+    print "Burning | " + dvAxis + " | " + round(plannedDv, 2) + " m/s est " + round(burnTime, 1) + " s      " at (0, rowBurnStatus).
     local burnStart is time:seconds.
     lock throttle to 1.
     until time:seconds - burnStart >= burnTime {
@@ -285,11 +218,33 @@ function execute_maneuver_node {
         if remain < fineThrottleDelta / accel {
             lock throttle to 0.05.
         }.
-        print "Plane burn | Remaining: " + round(remain, 1) + " s   " at (0, rowPlaneBurnCountdown).
+        print "Burn progress | Remaining: " + round(remain, 1) + " s   " at (0, rowBurnCountdown).
         wait 0.1.
     }.
     lock throttle to 0.
+    unlock steering.
     remove nd.
+}.
+
+// Schedule and immediately execute a prograde/retrograde burn at current time + nodeImmediateLead.
+function execute_immediate_proretro {
+    parameter dvCommand.
+
+    if abs(dvCommand) < 0.05 {
+        print "Burn skipped: dV too small.".
+        return.
+    }.
+
+    local dvAxis is "PROGRADE".
+    local ndDv is dvCommand.
+    if dvCommand < 0 {
+        set dvAxis to "RETROGRADE".
+        set ndDv to abs(dvCommand).
+    }.
+
+    local nd is node(time:seconds + nodeImmediateLead, 0, 0, ndDv).
+    add nd.
+    execute_burn_node(nd, dvAxis).
 }.
 
 function wait_for_phase_window {
@@ -329,13 +284,10 @@ function wait_for_phase_window {
 
         if (etaToWindow < 0 or etaToWindow > phaseHugeEta or abs(phaseRate) < phaseVerySlowRate) and abs(phaseError) > phaseNudgeMinError and nudgeCount < phaseMaxNudges and time:seconds - lastNudgeTime > phaseNudgeCooldown {
             local nudgeDv is phaseNudgeDv.
-            if phaseError < 0 {
-                set nudgeDv to -phaseNudgeDv.
-            }.
-
+            if phaseError < 0 { set nudgeDv to -phaseNudgeDv. }.
             set_warp_limited(0).
             print "Phase nudge " + (nudgeCount + 1) + "/" + phaseMaxNudges + ": " + round(nudgeDv, 2) + " m/s | Error: " + round(phaseError, 2) + " deg      " at (0, phaseNudgeRow).
-            burn_delta_v_proretro(nudgeDv).
+            execute_immediate_proretro(nudgeDv).
             set nudgeCount to nudgeCount + 1.
             set lastNudgeTime to time:seconds.
             wait 1.
@@ -362,7 +314,6 @@ function wait_for_phase_window {
             print "Fine phase lock timed out; continuing with error " + round(phaseError, 3) + " deg".
             break.
         }.
-
         wait statusFastInterval.
         set phaseError to shortest_angle_diff(current_phase_angle(), targetPhase).
         print "Fine phase lock | Error: " + round(phaseError, 3) + " deg | Warp: " + warp + "      " at (0, phaseStatusRow).
@@ -415,21 +366,13 @@ function do_plane_alignment {
 
     print "Planned node: " + chosenNode + " | Eta: " + round(nodeEta, 1) + " s | Dir: " + burnDirection + " | dV: " + round(planeDv, 2) + " m/s".
 
-    // Convert direction to signed normal dV and schedule a maneuver node.
-    // burnDirSign: +1 = normal, -1 = antinormal. burnDir recomputed fresh at burn time.
     local normalDv is planeDv.
-    local burnDirSign is 1.
-    if burnDirection = "ANTINORMAL" {
-        set normalDv to -planeDv.
-        set burnDirSign to -1.
-    }.
+    if burnDirection = "ANTINORMAL" { set normalDv to -planeDv. }.
     local planeNode is node(time:seconds + nodeEta, 0, normalDv, 0).
     add planeNode.
 
-    execute_maneuver_node(planeNode, burnDirSign).
-    if abortRequested {
-        return.
-    }.
+    execute_burn_node(planeNode, burnDirection).
+    if abortRequested { return. }.
     wait 2.
 
     set relativeInclination to abs(shortest_angle_diff(ship:orbit:inclination, target:orbit:inclination)).
@@ -480,10 +423,7 @@ function coast_to_intercept_and_trim {
     set trimWaitStart to time:seconds.
     set lastDistance to currentDistance.
     until currentDistance <= encounterTrimDistance or currentDistance > lastDistance {
-        if time:seconds - trimWaitStart > maxWaitTime {
-            break.
-        }.
-
+        if time:seconds - trimWaitStart > maxWaitTime { break. }.
         wait 0.5.
         set lastDistance to currentDistance.
         set currentDistance to (target:position - ship:position):mag.
@@ -494,7 +434,7 @@ function coast_to_intercept_and_trim {
     set trimDv to clamp(-trimPhaseError * encounterTrimScale, -encounterTrimMaxDv, encounterTrimMaxDv).
 
     print "Encounter trim planned | Phase error: " + round(trimPhaseError, 3) + " deg | dV: " + round(trimDv, 2) + " m/s".
-    burn_delta_v_proretro(trimDv).
+    execute_immediate_proretro(trimDv).
 }.
 
 function match_velocity_with_target {
@@ -526,17 +466,16 @@ function match_velocity_with_target {
         wait 0.1.
     }.
 
+    // Velocity match is a real-time feedback loop: relative retrograde varies during the burn.
     lock relativeVelocity to ship:velocity:orbit - targetVessel:velocity:orbit.
-    lock steering to lookdirup(-relativeVelocity, ship:up:vector).
-    wait until vang(ship:facing:vector, -relativeVelocity) < matchAlignTolerance.
+    lock steering to lookdirup(relativeVelocity * (-1), ship:up:vector).
+    wait until vang(ship:facing:vector, relativeVelocity * (-1)) < matchAlignTolerance.
 
     local steeringFrozen to false.
     until relativeVelocity:mag < matchTargetRelativeSpeed {
-        // Re-aim only while speed is high enough for a stable vector.
-        // Below threshold, freeze steering to prevent oscillation on a noisy near-zero vector.
         if relativeVelocity:mag > matchFreezeSteeringSpeed {
             if steeringFrozen {
-                lock steering to lookdirup(-relativeVelocity, ship:up:vector).
+                lock steering to lookdirup(relativeVelocity * (-1), ship:up:vector).
                 set steeringFrozen to false.
             }.
         } else {
@@ -566,7 +505,7 @@ function match_velocity_with_target {
     print "Velocity match complete.".
 }.
 
-function run_intercept2_workflow {
+function run_intercept3_workflow {
     // Compute transfer geometry first so we can compare AN/DN timing against the phase window.
     set mu to ship:body:mu.
     set shipRadius to ship:orbit:semimajoraxis.
@@ -582,7 +521,6 @@ function run_intercept2_workflow {
     print "Transfer time: " + round(transferTime, 1) + " s | Target phase: " + round(targetPhaseGoal, 3) + " deg".
 
     // Plane alignment decision: only correct plane if the nearest AN/DN arrives before the phase window.
-    // If the phase window arrives first, a plane burn now would delay the transfer past the window.
     local relativeInclination is abs(shortest_angle_diff(ship:orbit:inclination, target:orbit:inclination)).
     if relativeInclination > planeToleranceDeg {
         local initPhaseError is shortest_angle_diff(current_phase_angle(), targetPhaseGoal).
@@ -598,16 +536,12 @@ function run_intercept2_workflow {
         } else {
             print "Plane align: nearest node in " + round(etaNode / 60, 1) + " min, phase window in " + round(etaPhaseWindow / 60, 1) + " min -> correcting now.".
             do_plane_alignment().
-            if abortRequested {
-                return.
-            }.
+            if abortRequested { return. }.
         }.
     }.
 
     wait_for_phase_window(targetPhaseGoal).
-    if abortRequested {
-        return.
-    }.
+    if abortRequested { return. }.
 
     set circularVelocity to sqrt(mu / shipRadius).
     set transferVelocity to sqrt(mu * (2 / shipRadius - 1 / transferSemiMajorAxis)).
@@ -615,15 +549,11 @@ function run_intercept2_workflow {
 
     print "Step: Transfer burn".
     print "Planned transfer dV: " + round(transferDv, 2) + " m/s".
-    burn_delta_v_proretro(transferDv).
-    if abortRequested {
-        return.
-    }.
+    execute_immediate_proretro(transferDv).
+    if abortRequested { return. }.
 
     coast_to_intercept_and_trim(targetPhaseGoal).
-    if abortRequested {
-        return.
-    }.
+    if abortRequested { return. }.
 
     if doVelocityMatch {
         match_velocity_with_target().
@@ -642,14 +572,14 @@ if target:body:name <> ship:body:name {
     cleanup_and_exit("CRITICAL: Target is not around the same body.").
 }.
 
-print "intercept2 start | Mode: " + interceptMode.
+print "intercept3 start | Mode: " + interceptMode.
 print "Target: " + target:name + " | Body: " + ship:body:name.
 if ship:availablethrust <= 0 {
     print "Startup note: available thrust is currently zero; script will continue and validate thrust at burn steps.".
 }.
 
 if not abortRequested {
-    run_intercept2_workflow().
+    run_intercept3_workflow().
 }.
 
 lock throttle to 0.
@@ -658,7 +588,7 @@ unlock throttle.
 set ship:control:pilotmainthrottle to 0.
 force_warp_idle().
 if abortRequested {
-    print "intercept2 aborted: " + abortReason.
+    print "intercept3 aborted: " + abortReason.
 } else {
-    print "intercept2 workflow complete.".
+    print "intercept3 workflow complete.".
 }.
