@@ -41,7 +41,10 @@
 - [ ] kOS version is 1.5.1.
 - [ ] `kOS-MunTug.craft` loads in VAB without missing parts.
 - [ ] `kOS-MunTug-Launcher.craft` loads in VAB without missing parts.
+- [ ] `Space Station One.craft` loads in VAB without missing parts.
 - [ ] Full launcher staging is sensible and leaves the final spacecraft with its Terrier-powered transfer stage attached.
 - [ ] Launcher has battery storage, solar generation, and 4 lower fins.
 - [ ] Tug has docking port, HECS2, kOS CPU, monoprop tank, Terrier, FL-T400, and the intended RCS / comms hardware.
 - [ ] `launch.ks` can be run from the kOS terminal.
+- [ ] `launch_station.ks` is available to the Space Station One processor boot file and reaches the AG9 / AG10 launch prompt.
+- [ ] `set_intercept.ks` can be run after selecting a same-body target.
