@@ -116,7 +116,7 @@ foreach ($file in $kosFiles) {
 }
 
 $helperScripts = @(
-    (Join-Path $kosPath 'ss1\set_intercept.ks')
+    (Join-Path $kosPath 'ss1\intercept.ks')
     (Join-Path $kosPath 'ss1\match_velocity.ks')
 )
 
