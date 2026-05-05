@@ -87,6 +87,20 @@ Use this flow for `craft/Space Station One.craft`.
 
    `set_intercept.ks` expects a target to already be selected. It waits for the required same-body phase angle, then executes a direct Hohmann-style burn using the newer MunTug intercept logic.
 
+   For a faster/tighter setup that spends extra fuel before docking, run:
+
+   ```
+   run set_intercept("DOCK").
+   ```
+
+   With full-path invocation, pass the option as a second argument:
+
+   ```
+   runpath("0:/set_intercept", "DOCK").
+   ```
+
+   `DOCK` mode tightens phase tolerance, applies a modest overburn, and performs a short trim pass to set up a closer rendezvous for a follow-on docking procedure.
+
 6. Near closest approach, run:
 
    ```
@@ -97,7 +111,7 @@ Use this flow for `craft/Space Station One.craft`.
 
 7. Final approach and docking should be done manually with low-speed inputs (or your preferred docking script).
 
-If your scripts are stored in `0:/`, run with full paths instead (for example `runpath("0:/launch_station").`, `runpath("0:/set_intercept").`, and `runpath("0:/match_velocity").`).
+If your scripts are stored in `0:/`, run with full paths instead (for example `runpath("0:/launch_station").`, `runpath("0:/set_intercept", "DOCK").`, and `runpath("0:/match_velocity").`).
 
 `set_intercept.ks` and `match_velocity.ks` are stage-safe: neither script calls `stage`.
 

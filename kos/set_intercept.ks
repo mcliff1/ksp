@@ -1,6 +1,8 @@
 // Same-body intercept helper adapted from the latest working MunTug script.
 // Select a target in map view before running.
 
+parameter interceptMode is "NORMAL".
+
 clearscreen.
 
 set phaseTolerance to 1.
@@ -10,6 +12,18 @@ set coarseThrottleDelta to 5.
 set fineThrottleDelta to 1.
 set alignTolerance to 1.
 set statusUpdateInterval to 1.
+set burnScale to 1.
+set enableTrimPass to false.
+set trimDelay to 90.
+set trimDvPerDegree to 0.7.
+set maxTrimDv to 20.
+
+if interceptMode = "DOCK" or interceptMode = "dock" or interceptMode = "Dock" {
+    set phaseTolerance to 0.35.
+    set slowWarpPhaseError to 4.
+    set burnScale to 1.06.
+    set enableTrimPass to true.
+}.
 
 function normalize_angle {
     parameter angleDeg.
@@ -34,6 +48,68 @@ function shortest_angle_diff {
     }.
 
     return delta.
+}.
+
+function clamp {
+    parameter value, minValue, maxValue.
+
+    if value < minValue {
+        return minValue.
+    }.
+
+    if value > maxValue {
+        return maxValue.
+    }.
+
+    return value.
+}.
+
+function burn_delta_v {
+    parameter dvCommand.
+    local burnDirection is "PROGRADE".
+
+    if abs(dvCommand) < 0.05 {
+        print "Trim burn skipped: dV too small.".
+        return.
+    }.
+
+    if dvCommand >= 0 {
+        lock steering to prograde.
+        set burnDirection to "PROGRADE".
+        wait until vang(ship:facing:vector, prograde:vector) < alignTolerance.
+    } else {
+        lock steering to retrograde.
+        set burnDirection to "RETROGRADE".
+        wait until vang(ship:facing:vector, retrograde:vector) < alignTolerance.
+    }.
+
+    print "Executing " + burnDirection + " trim burn: " + round(dvCommand, 2) + " m/s".
+    lock throttle to 1.
+    set targetVelocity to ship:velocity:orbit:mag + dvCommand.
+
+    if dvCommand >= 0 {
+        until ship:velocity:orbit:mag >= targetVelocity {
+            if targetVelocity - ship:velocity:orbit:mag < coarseThrottleDelta {
+                lock throttle to 0.2.
+            }.
+            if targetVelocity - ship:velocity:orbit:mag < fineThrottleDelta {
+                lock throttle to 0.05.
+            }.
+            wait 0.1.
+        }.
+    } else {
+        until ship:velocity:orbit:mag <= targetVelocity {
+            if ship:velocity:orbit:mag - targetVelocity < coarseThrottleDelta {
+                lock throttle to 0.2.
+            }.
+            if ship:velocity:orbit:mag - targetVelocity < fineThrottleDelta {
+                lock throttle to 0.05.
+            }.
+            wait 0.1.
+        }.
+    }.
+
+    lock throttle to 0.
 }.
 
 function current_phase_angle {
@@ -104,6 +180,7 @@ set warp to 0.
 set circularVelocity to sqrt(mu / shipRadius).
 set transferVelocity to sqrt(mu * (2 / shipRadius - 1 / transferSemiMajorAxis)).
 set dv to transferVelocity - circularVelocity.
+set dv to dv * burnScale.
 
 if abs(dv) < 0.1 {
     cleanup_and_exit("Computed burn is too small for a meaningful intercept.").
@@ -120,29 +197,17 @@ if dv >= 0 {
 }.
 
 print "Executing burn: " + round(dv, 2) + " m/s".
-lock throttle to 1.
-set targetVelocity to ship:velocity:orbit:mag + dv.
+burn_delta_v(dv).
 
-if dv >= 0 {
-    until ship:velocity:orbit:mag >= targetVelocity {
-        if targetVelocity - ship:velocity:orbit:mag < coarseThrottleDelta {
-            lock throttle to 0.2.
-        }.
-        if targetVelocity - ship:velocity:orbit:mag < fineThrottleDelta {
-            lock throttle to 0.05.
-        }.
-        wait 0.1.
-    }.
-} else {
-    until ship:velocity:orbit:mag <= targetVelocity {
-        if ship:velocity:orbit:mag - targetVelocity < coarseThrottleDelta {
-            lock throttle to 0.2.
-        }.
-        if ship:velocity:orbit:mag - targetVelocity < fineThrottleDelta {
-            lock throttle to 0.05.
-        }.
-        wait 0.1.
-    }.
+if enableTrimPass {
+    print "DOCK mode: coasting before trim pass...".
+    wait trimDelay.
+
+    set trimPhaseError to shortest_angle_diff(current_phase_angle(), targetPhaseGoal).
+    set trimDv to clamp(-trimPhaseError * trimDvPerDegree, -maxTrimDv, maxTrimDv).
+
+    print "DOCK mode trim phase error: " + round(trimPhaseError, 2) + " deg".
+    burn_delta_v(trimDv).
 }.
 
 lock throttle to 0.
@@ -150,4 +215,4 @@ unlock steering.
 unlock throttle.
 set ship:control:pilotmainthrottle to 0.
 
-print "Intercept trajectory established.".
+print "Intercept trajectory established. Mode: " + interceptMode.
