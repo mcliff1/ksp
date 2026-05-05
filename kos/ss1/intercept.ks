@@ -274,7 +274,7 @@ function cleanup_and_exit {
     unlock steering.
     unlock throttle.
     set ship:control:pilotmainthrottle to 0.
-    exit.
+    EXIT.
 }.
 
 sas off.
