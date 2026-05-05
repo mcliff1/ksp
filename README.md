@@ -7,10 +7,12 @@ This repo contains stock KSP 1.12.5 craft files built to work with kOS 1.5.1 (no
 - `craft/kOS-MunTug.craft` — tug-only craft
 - `craft/kOS-MunTug-Launcher.craft` — full launcher + tug craft
 - `craft/Space Station One.craft` — heavy station-base launcher/platform
+- `craft/SS1 Mark2.craft` — Space Station One variant with stiffer radial booster mounts and extra first-stage propellant
 - `kos/launch.ks` — Mun tug launcher script for `kOS-MunTug-Launcher.craft`
-- `kos/launch_station.ks` — Space Station One boot/launch script with auto-staging and AG9/AG10 launch mode selection
-- `kos/set_intercept.ks` — same-body intercept helper for a selected target, intended for follow-on Space Station One rendezvous work
-- `kos/match_velocity.ks` — relative-velocity kill helper for same-body rendezvous after intercept
+- `kos/ss1/launch_station.ks` — Space Station One boot/launch script with auto-staging and AG9/AG10 launch mode selection
+- `kos/ss1/set_intercept.ks` — same-body intercept helper for a selected target, intended for follow-on Space Station One rendezvous work
+- `kos/ss1/match_velocity.ks` — relative-velocity kill helper for same-body rendezvous after intercept
+- `kos/launch_station.ks`, `kos/set_intercept.ks`, `kos/match_velocity.ks` — compatibility wrappers that forward to `kos/ss1/`
 
 ## Install
 
@@ -19,6 +21,7 @@ This repo contains stock KSP 1.12.5 craft files built to work with kOS 1.5.1 (no
    - `craft/kOS-MunTug.craft`
    - `craft/kOS-MunTug-Launcher.craft`
    - `craft/Space Station One.craft`
+   - `craft/SS1 Mark2.craft`
 
    to:
 
@@ -30,8 +33,11 @@ This repo contains stock KSP 1.12.5 craft files built to work with kOS 1.5.1 (no
    - `KSP/Ships/Script/launch_station.ks`
    - `KSP/Ships/Script/set_intercept.ks`
    - `KSP/Ships/Script/match_velocity.ks`
+   - `KSP/Ships/Script/ss1/launch_station.ks`
+   - `KSP/Ships/Script/ss1/set_intercept.ks`
+   - `KSP/Ships/Script/ss1/match_velocity.ks`
 
-   `Space Station One.craft` is configured with boot file `launch_station`, so `launch_station.ks` must be available on the processor's readable volume.
+   `Space Station One.craft` is configured with boot file `launch_station`, so `launch_station.ks` must still be available on the processor's readable volume. The root SS1 scripts are wrappers, so copy the `ss1/` subfolder as well.
 
 ## Use in game
 
@@ -66,7 +72,9 @@ Use this flow for `craft/kOS-MunTug-Launcher.craft`.
 
 Use this flow for `craft/Space Station One.craft`.
 
-1. Make sure the kOS CPU can read `launch_station.ks`, `set_intercept.ks`, and `match_velocity.ks`.
+If the original launcher feels too flexible on ascent, `craft/SS1 Mark2.craft` is a heavier-launch variant with stiffer radial booster attachments and more side-booster propellant for an easier climb to LKO.
+
+1. Make sure the kOS CPU can read `launch_station.ks`, `set_intercept.ks`, `match_velocity.ks`, and the `ss1/` subfolder versions they forward to.
 2. The craft's boot file is `launch_station`, so the launch script should preload automatically when the vessel becomes active.
 3. On the pad, trigger:
 
@@ -111,7 +119,7 @@ Use this flow for `craft/Space Station One.craft`.
 
 7. Final approach and docking should be done manually with low-speed inputs (or your preferred docking script).
 
-If your scripts are stored in `0:/`, run with full paths instead (for example `runpath("0:/launch_station").`, `runpath("0:/set_intercept", "DOCK").`, and `runpath("0:/match_velocity").`).
+If your scripts are stored in `0:/`, the existing root commands still work as long as the `ss1/` subfolder is present. The direct implementation paths are `runpath("0:/ss1/launch_station").`, `runpath("0:/ss1/set_intercept", "DOCK").`, and `runpath("0:/ss1/match_velocity").`.
 
 `set_intercept.ks` and `match_velocity.ks` are stage-safe: neither script calls `stage`.
 
@@ -126,15 +134,16 @@ powershell -ExecutionPolicy Bypass -File .\tools\check-kos-static.ps1
 What it checks:
 
 - brace-balance sanity across all `kos/**/*.ks` files (legacy bare `}` style is warned, not failed)
-- helper-script stage safety (no direct `stage` call) for `set_intercept.ks` and `match_velocity.ks`
+- helper-script stage safety (no direct `stage` call) for `kos/ss1/set_intercept.ks` and `kos/ss1/match_velocity.ks`
 - helper-script target guards (`if not hastarget` and same-body check)
 
 ## Space Station One notes
 
 - `craft/Space Station One.craft` now uses `vesselType = Probe` and kOS boot file `launch_station`.
-- `launch_station.ks` is the intended launch profile for `Space Station One`; `launch.ks` remains the Mun tug launcher script.
-- `set_intercept.ks` is the intended follow-on script for Space Station One rendezvous/intercept operations after reaching orbit.
-- `match_velocity.ks` is the intended follow-on helper after `set_intercept.ks` to reduce relative speed at closest approach.
+- `kos/ss1/launch_station.ks` is the intended launch profile for `Space Station One`; `launch.ks` remains the Mun tug launcher script.
+- `kos/ss1/set_intercept.ks` is the intended follow-on script for Space Station One rendezvous/intercept operations after reaching orbit.
+- `kos/ss1/match_velocity.ks` is the intended follow-on helper after `set_intercept.ks` to reduce relative speed at closest approach.
+- The root SS1 scripts are compatibility wrappers so existing boot files and `run` commands do not need to change.
 - The craft currently uses large docking ports, while `kOS-MunTug` uses a standard docking port.
 - Add a docking adapter path in the VAB (or a standard port on the station) before mixed-diameter docking operations.
 - Add dedicated comms relay hardware and RCS translation authority in the VAB if this vehicle will act as an autonomous station assembly hub.
