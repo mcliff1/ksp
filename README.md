@@ -12,8 +12,9 @@ This repo contains stock KSP 1.12.5 craft files built to work with kOS 1.5.1 (no
 - `kos/ss1/launch_station.ks` — Space Station One boot/launch script with auto-staging and AG9/AG10 launch mode selection
 - `kos/ss1/intercept.ks` — same-body intercept + encounter-trim + velocity-match helper for a selected target
 - `kos/ss1/intercept2.ks` — docking-first intercept workflow with explicit maneuver-step countdown/status output
+- `kos/ss1/intercept3.ks` — all-burns-as-maneuver-nodes intercept workflow with fixed-row live status output
 - `kos/ss1/match_velocity.ks` — relative-velocity kill helper for same-body rendezvous after intercept
-- `kos/launch_station.ks`, `kos/intercept.ks`, `kos/intercept2.ks`, `kos/match_velocity.ks` — primary root entrypoints that forward to `kos/ss1/`
+- `kos/launch_station.ks`, `kos/intercept.ks`, `kos/intercept2.ks`, `kos/intercept3.ks`, `kos/match_velocity.ks` — primary root entrypoints that forward to `kos/ss1/`
 - `kos/set_intercept.ks` — compatibility alias that forwards to `kos/intercept.ks`
 
 ## Install
@@ -35,11 +36,13 @@ This repo contains stock KSP 1.12.5 craft files built to work with kOS 1.5.1 (no
    - `KSP/Ships/Script/launch_station.ks`
    - `KSP/Ships/Script/intercept.ks`
    - `KSP/Ships/Script/intercept2.ks`
+   - `KSP/Ships/Script/intercept3.ks`
    - `KSP/Ships/Script/set_intercept.ks`
    - `KSP/Ships/Script/match_velocity.ks`
    - `KSP/Ships/Script/ss1/launch_station.ks`
    - `KSP/Ships/Script/ss1/intercept.ks`
    - `KSP/Ships/Script/ss1/intercept2.ks`
+   - `KSP/Ships/Script/ss1/intercept3.ks`
    - `KSP/Ships/Script/ss1/set_intercept.ks`
    - `KSP/Ships/Script/ss1/match_velocity.ks`
 
@@ -103,6 +106,12 @@ If the original launcher feels too flexible on ascent, `craft/SS1 Mark2.craft` i
 
    ```
    run intercept2.
+   ```
+
+   For the all-burns-as-node workflow (including transfer and trim burns), run:
+
+   ```
+   run intercept3.
    ```
 
    `intercept.ks` expects a target to already be selected. It runs a full rendezvous setup sequence: phase alignment, transfer burn, coast with warp to encounter, encounter trim, and built-in velocity matching.
@@ -230,6 +239,23 @@ Review goals for `intercept2`:
 | 17  | Velocity match burn — relative speed (m/s) |
 
 Scrolling (non-fixed) print lines appear above row 8 and log step transitions, burn plans, warp exit reasons, completion messages, and abort messages.
+
+### `intercept3` display layout
+
+`intercept3` uses the same fixed-row model and row numbers as `intercept2`, but row labels for maneuver execution are generalized because all major burns are executed through maneuver nodes.
+
+| Row | Content |
+|-----|---------|
+| 8   | Active burn countdown (seconds remaining in timed burn execution) |
+| 9   | Active burn status — maneuver axis (prograde/retrograde/normal/antinormal), planned delta-v, estimated burn time |
+| 11  | Phase window status — phase error (deg), drift rate (deg/s), ETA to window (min), current warp level; also used for fine phase lock error |
+| 12  | Phase nudge status — nudge index, delta-v applied (m/s), current phase error (deg) |
+| 14  | Maneuver-node warp countdown (seconds to node) |
+| 15  | Burn lead countdown (seconds to ignition lead window) |
+| 17  | Coast status — current range to target (m) |
+| 18  | Encounter trim wait — current range to target (m) |
+| 20  | Velocity match approach wait — current range to target (m) |
+| 21  | Velocity match burn — relative speed (m/s) |
 
 ## Static checks
 

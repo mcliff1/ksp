@@ -11,6 +11,8 @@ set maxCommandWarp to 4.
 set statusSlowInterval to 1.
 set statusFastInterval to 0.2.
 set alignTolerance to 1.
+set alignSettleTime to 0.6.
+set maxAlignWaitTime to 120.
 
 set planeToleranceDeg to 0.2.
 set nodeWarpExitEta to 120.
@@ -33,14 +35,14 @@ set phaseVerySlowRate to 0.0002.
 // Fixed display row assignments.
 set rowBurnCountdown to 8.
 set rowBurnStatus to 9.
-set phaseStatusRow to 10.
-set phaseNudgeRow to 11.
-set rowNodeWarp to 12.
-set rowBurnLead to 13.
-set rowCoastStatus to 14.
-set rowEncounterTrim to 15.
-set rowVelocityMatchWait to 16.
-set rowVelocityMatchBurn to 17.
+set phaseStatusRow to 11.
+set phaseNudgeRow to 12.
+set rowNodeWarp to 14.
+set rowBurnLead to 15.
+set rowCoastStatus to 17.
+set rowEncounterTrim to 18.
+set rowVelocityMatchWait to 20.
+set rowVelocityMatchBurn to 21.
 
 set burnScale to 1.06.
 set coarseThrottleDelta to 5.
@@ -204,7 +206,34 @@ function execute_burn_node {
         print "Burn lead | " + dvAxis + " | ETA: " + round(nd:eta, 1) + " s   " at (0, rowBurnLead).
         wait 0.1.
     }.
-    wait until vang(ship:facing:vector, burnDir) < alignTolerance.
+
+    // Require stable pointing before ignition so each maneuver starts with correct orientation.
+    local alignStart is time:seconds.
+    local alignedSince is -1.
+    until false {
+        local alignError is vang(ship:facing:vector, burnDir).
+        print "Align | " + dvAxis + " | Error: " + round(alignError, 2) + " deg   " at (0, rowBurnLead).
+
+        if alignError < alignTolerance {
+            if alignedSince < 0 {
+                set alignedSince to time:seconds.
+            }.
+
+            if time:seconds - alignedSince >= alignSettleTime {
+                break.
+            }.
+        } else {
+            set alignedSince to -1.
+        }.
+
+        if time:seconds - alignStart > maxAlignWaitTime {
+            remove nd.
+            cleanup_and_exit("Alignment timeout before " + dvAxis + " maneuver burn.").
+            return.
+        }.
+
+        wait 0.1.
+    }.
 
     // Timed burn with throttle taper.
     print "Burning | " + dvAxis + " | " + round(plannedDv, 2) + " m/s est " + round(burnTime, 1) + " s      " at (0, rowBurnStatus).
@@ -469,7 +498,19 @@ function match_velocity_with_target {
     // Velocity match is a real-time feedback loop: relative retrograde varies during the burn.
     lock relativeVelocity to ship:velocity:orbit - targetVessel:velocity:orbit.
     lock steering to lookdirup(relativeVelocity * (-1), ship:up:vector).
-    wait until vang(ship:facing:vector, relativeVelocity * (-1)) < matchAlignTolerance.
+
+    // Require orientation lock before starting the velocity-match burn.
+    local matchAlignStart is time:seconds.
+    until vang(ship:facing:vector, relativeVelocity * (-1)) < matchAlignTolerance {
+        print "Match align | Error: " + round(vang(ship:facing:vector, relativeVelocity * (-1)), 2) + " deg   " at (0, rowVelocityMatchBurn).
+
+        if time:seconds - matchAlignStart > maxAlignWaitTime {
+            cleanup_and_exit("Alignment timeout before velocity match burn.").
+            return.
+        }.
+
+        wait 0.1.
+    }.
 
     local steeringFrozen to false.
     until relativeVelocity:mag < matchTargetRelativeSpeed {

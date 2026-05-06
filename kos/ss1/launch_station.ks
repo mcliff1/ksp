@@ -40,7 +40,7 @@ function mun_phase_angle {
 
 function circularization_lead_time {
     if ship:name = "SS1 Mark2" {
-        return 15.
+        return 21.
     }.
 
     return 25.
@@ -267,6 +267,16 @@ function wait_for_launch_trigger {
 
     print "Launch script preloaded.".
     print "Invoke AG9 for KERBIN launch or AG10 for MUN launch.".
+
+    // After a quicksave/load, action groups can remain latched ON.
+    // Require AG9/AG10 to be released first so launch only starts on a fresh toggle.
+    if ag9 or ag10 {
+        print "AG9/AG10 already active on startup; waiting for both to be turned OFF.".
+        until not ag9 and not ag10 {
+            wait 0.1.
+        }.
+        print "Trigger reset detected. Toggle AG9 or AG10 to launch.".
+    }.
 
     until ag9 or ag10 {
         wait 0.1.
