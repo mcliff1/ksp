@@ -185,3 +185,20 @@ The script does not need to solve docking, landing, or precision science operati
 - tug reaches parking orbit with substantial remaining LF/Ox
 - mission can achieve a Mun intercept with return margin still available
 - script behavior is understandable enough to debug from the kOS terminal
+
+## Space Station One integration status
+
+Applied in-repo updates:
+
+- `craft/Space Station One.craft` set to `vesselType = Probe`.
+- `craft/Space Station One.craft` kOS processor boot file set to `launch_station`.
+- new `kos/launch_station.ks` script added for Space Station One with:
+	- ascent auto-staging behavior
+	- Kerbin parking-orbit default workflow
+	- optional Mun transfer mode (`targetMode = "MUN"`)
+
+Manual VAB updates still required for station-construction operations:
+
+- add docking compatibility between Space Station One and `kOS-MunTug` (adapter or matching port standard)
+- add dedicated relay/high-gain comms if operating deep-space or far-side Mun workflows
+- add RCS translation hardware on the station base if it must actively assist docking/alignment
